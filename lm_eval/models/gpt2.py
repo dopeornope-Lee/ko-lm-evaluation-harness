@@ -1,6 +1,7 @@
 import torch
 import transformers
 from typing import Optional
+from peft import PeftModel, PeftConfig
 from lm_eval.base import BaseLM
 
 
@@ -41,22 +42,35 @@ class HFLM(BaseLM):
         # TODO: update this to be less of a hack once subfolder is fixed in HF
         revision = revision + ("/" + subfolder if subfolder is not None else "")
 
-        self.gpt2 = transformers.AutoModelForCausalLM.from_pretrained(
-            pretrained,
-            load_in_8bit=load_in_8bit,
-            low_cpu_mem_usage=low_cpu_mem_usage,
-            revision=revision,
-            trust_remote_code=trust_remote_code,
-            torch_dtype=torch.float16,
-        ).to(self.device)
+        # self.gpt2 = transformers.AutoModelForCausalLM.from_pretrained(
+        #     pretrained,
+        #     load_in_8bit=load_in_8bit,
+        #     low_cpu_mem_usage=low_cpu_mem_usage,
+        #     revision=revision,
+        #     trust_remote_code=trust_remote_code,
+        #     torch_dtype=torch.float16,
+        # ).to(self.device)
+        
+        
+        peft_model_id = "DopeorNope/KOAT-5.8b"
+
+        config = PeftConfig.from_pretrained(peft_model_id)
+
+
+        self.gpt2 = transformers.AutoModelForCausalLM.from_pretrained(config.base_model_name_or_path,torch_dtype=torch.float16,low_cpu_mem_usage=True).cuda()
+
+        self.gpt2 = PeftModel.from_pretrained(self.gpt2, peft_model_id)
+        
+        
         self.gpt2.eval()
 
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(
-            pretrained if tokenizer is None else tokenizer,
-            revision=revision,
-            trust_remote_code=trust_remote_code,
-        )
-
+        # self.tokenizer = transformers.AutoTokenizer.from_pretrained(
+        #     pretrained if tokenizer is None else tokenizer,
+        #     revision=revision,
+        #     trust_remote_code=trust_remote_code,
+        # )
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained("EleutherAI/polyglot-ko-5.8b")
+        
         self.vocab_size = self.tokenizer.vocab_size
 
         if isinstance(
